@@ -1,0 +1,163 @@
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', arial, sans-serif;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #1a1c2c 0%, #4a192c 100%);
+    /* Deep blue to rich maroon gradient */
+    color: #ffffff;
+    overflow: hidden;
+}
+
+/* Container for the content */
+.container {
+    max-width: 800px;
+    padding: 2rem;
+    text-align: center;
+    animation: fadeIn 1.5s ease-out;
+    transition: opacity 1s ease-in-out, transform 1s ease-in-out;
+    /* Ensure it doesn't shift layout too much when hiding */
+    position: absolute;
+    top: 40%;
+    transform: translateY(-50%);
+}
+
+/* Quote Text */
+.quote-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.2rem;
+    line-height: 1.4;
+    font-weight: 400;
+    margin-bottom: 2rem;
+    color: #e8eaed;
+}
+
+/* Author and Book */
+.quote-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 1rem;
+    color: #9aa0a6;
+}
+
+.author {
+    font-weight: 500;
+    color: #e8eaed;
+}
+
+.book {
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+/* Search Container - Mimicking Chrome NTP */
+.search-container {
+    position: absolute;
+    /* Center exactly like Chrome's search bar usually resides */
+    top: calc(40% + 50px);
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 1s ease-in-out;
+}
+
+.google-logo {
+    margin-bottom: 38px;
+    height: 92px;
+}
+
+.search-box {
+    position: relative;
+    width: 561px;
+    max-width: 90%;
+    height: 44px;
+    background: #303134;
+    border-radius: 24px;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    border: 1px solid #303134;
+    box-shadow: 0 1px 6px 0 rgba(0, 0, 0, 0.28);
+    /* Slightly less prominent than previous */
+    transition: background-color 200ms, box-shadow 200ms, border-color 200ms;
+}
+
+.search-box:hover,
+.search-box:focus-within {
+    background: #303134;
+    border-color: rgba(223, 225, 229, 0);
+    box-shadow: 0 1px 6px 0 rgba(0, 0, 0, 0.28);
+    /* Keep it subtle */
+}
+
+/* When focused, Chrome often adds a slight highlight or shadow, but keeping it simple is safer */
+
+.search-icon {
+    fill: #9aa0a6;
+    margin-right: 12px;
+    width: 20px;
+    height: 20px;
+}
+
+#search-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    width: 100%;
+    height: 100%;
+    color: #e8eaed;
+    font-size: 16px;
+    font-family: arial, sans-serif;
+}
+
+#search-input::placeholder {
+    color: #9aa0a6;
+}
+
+/* Animation Classes */
+.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.fade-in {
+    opacity: 1 !important;
+}
+
+/* Fade In Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) translateY(-50%);
+        /* Adjust for absolute positioning */
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) translateY(-50%);
+    }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .quote-text {
+        font-size: 1.8rem;
+    }
+
+    .search-box {
+        width: 90%;
+    }
+}
