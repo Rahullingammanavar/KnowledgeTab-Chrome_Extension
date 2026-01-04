@@ -298,6 +298,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Manual Quote Handling
+    const manualQuoteText = document.getElementById('manualQuoteText');
+    const manualQuoteSource = document.getElementById('manualQuoteSource');
+    const addManualQuoteBtn = document.getElementById('addManualQuoteBtn');
+    const manualStatus = document.getElementById('manualStatus');
+
+    if (addManualQuoteBtn) {
+        addManualQuoteBtn.addEventListener('click', async () => {
+            const text = manualQuoteText.value.trim();
+            const source = manualQuoteSource.value.trim() || "My Thoughts";
+
+            if (!text) {
+                showStatus(manualStatus, 'Please enter some text.', 'error');
+                return;
+            }
+
+            try {
+                await addQuote(text, source);
+                manualQuoteText.value = '';
+                manualQuoteSource.value = '';
+                showStatus(manualStatus, 'Thought saved successfully!', 'success');
+            } catch (err) {
+                console.error(err);
+                showStatus(manualStatus, 'Failed to save.', 'error');
+            }
+        });
+    }
+
     async function addQuote(text, bookTitle) {
         if (!bookTitle) return;
 
@@ -316,17 +344,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
         allQuotes.push(newQuote);
 
-        // Update book count
+        // Update book count or create new book
         const bookIndex = books.findIndex(b => b.title === bookTitle);
         if (bookIndex !== -1) {
             books[bookIndex].quoteCount += 1;
+        } else {
+            // Create new book entry
+            books.push({
+                title: bookTitle,
+                quoteCount: 1,
+                date: new Date().toISOString()
+            });
         }
 
         await chrome.storage.local.set({ customQuotes: allQuotes, processedBooks: books });
 
         // Refresh views
         updateBookList(books);
-        await renderModalQuotes(bookTitle);
+
+        // Only render modal if it's open and matches
+        if (currentOpenBook === bookTitle) {
+            await renderModalQuotes(bookTitle);
+        }
 
         // Update stats
         const total = 22 + allQuotes.length;
@@ -342,7 +381,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let books = data.processedBooks || [];
 
         // Filter out the specific quote
-        // We match by text since we don't have IDs. Limitation: Duplicate texts will both be deleted.
         const initialLength = allQuotes.length;
         allQuotes = allQuotes.filter(q => q.text !== quoteText);
 
@@ -352,13 +390,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const bookIndex = books.findIndex(b => b.title === bookTitle);
         if (bookIndex !== -1) {
             books[bookIndex].quoteCount = Math.max(0, books[bookIndex].quoteCount - 1);
+
+            // Optional: Remove book if count is 0? 
+            // Only if it's not a real file-based book maybe? For now keep it simple.
+            if (books[bookIndex].quoteCount === 0) {
+                // Maybe remove it? Let's keep it so user can add back to it easily.
+            }
         }
 
         await chrome.storage.local.set({ customQuotes: allQuotes, processedBooks: books });
 
         // Refresh views
         updateBookList(books);
-        await renderModalQuotes(bookTitle);
+        if (currentOpenBook === bookTitle) {
+            await renderModalQuotes(bookTitle);
+        }
 
         // Update stats
         const total = 22 + allQuotes.length;
