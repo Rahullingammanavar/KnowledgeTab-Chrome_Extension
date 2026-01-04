@@ -56,12 +56,12 @@ class AIService {
             - "author": "Unknown" (since we are analyzing a chunk, unless you recognize the likely author, else default to "Unknown").
             - "book": "Uploaded Book" (placeholder).
             
-            Extract between 3 to 10 quotes depending on the content quality.
+            Extract between 1 to 5 quotes depending on the content quality. If the text has no inspiring quotes, return an empty array.
             Do not include any markdown formatting (like \`\`\`json) in the response, just the raw JSON string.
             
             Text to analyze:
-            "${text.substring(0, 30000)}..." 
-            (Truncated for safety)
+            Text to analyze:
+            "${text}"
         `;
 
         try {

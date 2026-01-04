@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Self-Help Wisdom — Master Study Guide</title>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background:#f7f9fb; padding:40px; line-height:1.6; color: #1a1a1a; }
+    .container { max-width:900px; margin:auto; background:white; padding:40px; border-radius:16px; box-shadow:0 4px 24px rgba(0,0,0,0.06); }
+    
+    h1 { font-size:32px; font-weight: 800; margin-bottom: 16px; color: #111; letter-spacing: -0.5px; }
+    h2 { font-size:24px; font-weight: 700; margin-top: 40px; margin-bottom: 16px; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px; color: #222; }
+    h3 { font-size:18px; font-weight: 600; margin-top: 24px; color: #444; }
+    
+    p { margin-bottom: 16px; color: #444; }
+    ul, ol { margin-bottom: 16px; padding-left: 24px; color: #444; }
+    li { margin-bottom: 8px; }
+    
+    .pitch { background: linear-gradient(135deg, #eef6ff 0%, #f5f9ff 100%); border: 1px solid #dbeafe; padding: 24px; border-radius: 12px; margin-bottom: 32px; }
+    .pitch strong { display: block; color: #0b66c3; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; margin-bottom: 8px; }
+    
+    .concept-block { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+    .concept-title { font-weight: 700; color: #111; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .concept-tag { background: #f3f4f6; color: #4b5563; font-size: 12px; padding: 2px 8px; border-radius: 12px; font-weight: 500; }
+    
+    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: 'Menlo', 'Monaco', monospace; font-size: 0.9em; color: #0f172a; }
+    pre { background: #1e293b; color: #e2e8f0; padding: 20px; border-radius: 8px; overflow-x: auto; font-family: 'Menlo', 'Monaco', monospace; font-size: 13px; margin: 16px 0; }
+    
+    .flow-step { border-left: 3px solid #cbd5e1; padding-left: 20px; margin-left: 10px; padding-bottom: 24px; position: relative; }
+    .flow-step:last-child { border-left: 3px solid transparent; }
+    .flow-step::before { content: ''; position: absolute; left: -8px; top: 0; width: 13px; height: 13px; background: #64748b; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 1px #cbd5e1; }
+    .flow-title { font-weight: 700; color: #334155; margin-bottom: 4px; }
+    
+    table { width:100%; border-collapse:collapse; margin-top:16px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+    th { background: #f9fafb; font-weight: 600; text-align: left; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; }
+    td { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #4b5563; }
+    tr:last-child td { border-bottom: none; }
+    
+    .interview-q { margin-top: 24px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+    .question { background: #f8fafc; padding: 16px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #e5e7eb; }
+    .answer { padding: 16px; color: #334155; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Self-Help Wisdom — Master Study Guide</h1>
+  
+  <div class="pitch">
+    <strong>30-Second Elevator Pitch</strong>
+    <p style="font-size: 1.1em; color: #1e293b; margin: 0;">
+      "I built a Chrome extension that transforms the new tab page into a personalized source of wisdom. Unlike generic quote apps, it uses <b>Google Gemini AI</b> to read the user's <i>own</i> PDF books and extract meaningful insights. I architected it using <b>Manifest V3</b> for security, <b>PDF.js</b> for privacy-focused local parsing, and created a dynamic model-discovery system to ensure resilience against API changes."
+    </p>
+  </div>
+
+  <h2>Phase 1: High-Level Architecture</h2>
+  <p>Understanding the "3 Pillars" of the extension structure.</p>
+
+  <div class="concept-block">
+    <div class="concept-title">1. The "Face" (New Tab Page) <span class="concept-tag" style="background:#dbeafe; color:#1e40af">newtab.html</span></div>
+    <p>This is the entry point. We use the <code>chrome_url_overrides</code> API in <code>manifest.json</code> to tell Chrome: "Stop showing the Google Search bar. Show my HTML instead." It is lightweight and designed to load instantly.</p>
+  </div>
+
+  <div class="concept-block">
+    <div class="concept-title">2. The "Brain" (AI Service) <span class="concept-tag" style="background:#fce7f3; color:#9d174d">services/ai_service.js</span></div>
+    <p>Chrome Extensions run locally, but we need cloud intelligence. This service handles the handshake with Google's servers. It's sandboxed and requires the <code>host_permissions</code> declaration to access <code>generativelanguage.googleapis.com</code>.</p>
+  </div>
+
+  <div class="concept-block">
+    <div class="concept-title">3. The "Memory" (Storage) <span class="concept-tag" style="background:#fff7ed; color:#9a3412">chrome.storage.local</span></div>
+    <p>We don't have a backend database. Instead, we use Chrome's built-in key-value store. It lives on the user's hard drive, ensuring their data (API keys, extracted quotes) never leaves their computer (Privacy First).</p>
+  </div>
+
+  <h2>Phase 2: The Tech Stack (Deep Dive)</h2>
+  
+  <h3>Why Vanilla JavaScript?</h3>
+  <p>Many developers use React, but for a New Tab extension, <b>speed is everything</b>. Initializing a framework takes valuable milliseconds. By using Vanilla JS, the quotes appear instantly with zero "loading spinners" or hydration delay.</p>
+
+  <h3>Why PDF.js?</h3>
+  <p>Browsers can't natively read the text inside a PDF file via JavaScript. We use Mozilla's <code>pdf.js</code> library. It parses the binary PDF data into an "ArrayBuffer", decodes the fonts and layout, and returns plain text strings. We implemented this with a <b>Web Worker</b> (<code>pdf.worker.min.js</code>) to prevent the browser UI from freezing while reading large books.</p>
+
+  <h3>Why Google Gemini API?</h3>
+  <p>We need semantic understanding. A regular regex script can't tell the difference between "Chapter 1" (useless) and "The only way to do great work is to love what you do" (wisdom). Gemini's LLM capabilities allow us to extract *meaning*, not just text.</p>
+
+  <h2>Phase 3: Code Walkthrough (Data Flow)</h2>
+  <div style="margin-top: 20px;">
+  
+    <div class="flow-step">
+      <div class="flow-title">Step 1: The Upload</div>
+      <div>
+        File: <code>options.js</code><br>
+        Event: <code>dropZone.addEventListener('drop')</code><br>
+        We capture the file object and validate it is `application/pdf`.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-title">Step 2: Parsing</div>
+      <div>
+        File: <code>options.js</code> → <code>lib/pdf.min.js</code><br>
+        We call <code>pdfjsLib.getDocument()</code>. The file is read page-by-page. We concatenate the text into a massive string variable.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-title">Step 3: Intelligence</div>
+      <div>
+        File: <code>services/ai_service.js</code><br>
+        Function: <code>extractQuotes()</code><br>
+        We construct a prompt: <i>"You are an expert literary curator..."</i>. We verify the API Key exists and send a POST request to Google.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-title">Step 4: Persistence</div>
+      <div>
+        File: <code>options.js</code><br>
+        We receive the JSON array from AI. we use <code>chrome.storage.local.set()</code> to save it permanently.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-title">Step 5: Display</div>
+      <div>
+        File: <code>script.js</code><br>
+        On every new tab load, we immediately call <code>chrome.storage.local.get()</code>, pick a random index, and inject the text into the DOM.
+      </div>
+    </div>
+
+  </div>
+
+  <h2>Key Challenges & Solutions</h2>
+  <table>
+    <tr>
+      <th>Challenge</th>
+      <th>Solution</th>
+    </tr>
+    <tr>
+      <td><b>API Model Rot</b> (Old models stop working)</td>
+      <td>Implemented "Dynamic Discovery". The code queries <code>/models</code> first to find a valid active model (e.g., Flash 1.5) instead of hardcoding one.</td>
+    </tr>
+    <tr>
+      <td><b>Blocking the UI</b> (Large PDFs)</td>
+      <td>Offloaded PDF parsing to a background <b>Web Worker</b>. This keeps the mouse and interface responsive even while processing a 500-page book.</td>
+    </tr>
+    <tr>
+      <td><b>Unreliable AI Output</b> (Chatty responses)</td>
+      <td>Prompt Engineering. We explicitly instruct the AI: <i>"Return ONLY a valid JSON array"</i> and added a code sanitization step to strip out Markdown fences.</td>
+    </tr>
+  </table>
+
+  <h2>Interview Q&A Prep</h2>
+
+  <div class="interview-q">
+    <div class="question">Q: Why did you choose Manifest V3 over V2?</div>
+    <div class="answer">Manifest V3 is the required standard for Chrome now. It offers better security (no remote code execution) and performance (service workers instead of persistent background pages).</div>
+  </div>
+
+  <div class="interview-q">
+    <div class="question">Q: How do you handle secrets (API Keys)?</div>
+    <div class="answer">We store them in <code>chrome.storage.local</code>. This is safer than localStorage because it's isolated to the extension context, but for a production app, we might encourage users to use an env variable or backend proxy. Since this is a client-side tool, user-owned keys are the standard pattern.</div>
+  </div>
+
+  <div class="interview-q">
+    <div class="question">Q: What happens if the PDF is scanned images?</div>
+    <div class="answer">Currently, PDF.js handles text layers well. For purely image-based PDFs, we would need OCR (Optical Character Recognition). I added error handling that detects if <code>extractedText.length</code> is too small and warns the user that the PDF might be an image scan.</div>
+  </div>
+
+</div>
+</body>
+</html>

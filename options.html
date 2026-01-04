@@ -223,6 +223,27 @@
         </div>
     </div>
 
+    <!-- Quote Management Modal -->
+    <div id="quoteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalBookTitle">Book Title</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+
+            <div class="add-quote-section">
+                <textarea id="newQuoteText" placeholder="Type a new quote here..."></textarea>
+                <button id="addQuoteBtn" class="btn">Add Quote</button>
+            </div>
+
+            <div class="modal-body">
+                <ul id="modalQuoteList" class="quote-list">
+                    <!-- Quotes injected here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
     <!-- Dependencies -->
     <script src="lib/pdf.min.js"></script>
 

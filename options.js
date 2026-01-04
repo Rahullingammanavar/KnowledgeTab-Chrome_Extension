@@ -87,9 +87,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Show loading state
-        showStatus(uploadStatus, `Processing ${file.name}... This may take a moment.`, 'success');
-
         try {
             // 1. Check API Key
             const data = await chrome.storage.local.get(['geminiApiKey', 'processedBooks']);
@@ -98,34 +95,50 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            showStatus(uploadStatus, `Reading ${file.name}...`, 'success');
+
             // 2. Read PDF
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
 
-            let fullText = '';
-            // Limit to first 40 pages to ensure we get good content but stay within reasonable limits
-            // Most "Intro" and "Chapter 1" wisdom is here.
-            const maxPages = Math.min(pdf.numPages, 40);
+            const CHUNK_SIZE = 20; // Process 20 pages at a time
+            const totalPages = pdf.numPages;
+            let allQuotes = [];
 
-            for (let i = 1; i <= maxPages; i++) {
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join(' ');
-                fullText += pageText + ' ';
+            // 3. Process in Chunks
+            for (let i = 1; i <= totalPages; i += CHUNK_SIZE) {
+                const endPage = Math.min(i + CHUNK_SIZE - 1, totalPages);
+                showStatus(uploadStatus, `Analyzing pages ${i}-${endPage} of ${totalPages}...`, 'success');
+
+                let chunkText = '';
+                for (let j = i; j <= endPage; j++) {
+                    const page = await pdf.getPage(j);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    chunkText += pageText + ' ';
+                }
+
+                if (chunkText.trim().length > 100) {
+                    try {
+                        const chunkQuotes = await AIService.extractQuotes(chunkText, data.geminiApiKey);
+                        allQuotes = [...allQuotes, ...chunkQuotes];
+                    } catch (err) {
+                        console.warn(`Failed to extract quotes from pages ${i}-${endPage}:`, err);
+                        // Continue to next chunk even if one fails
+                    }
+                }
+
+                // Small delay to be nice to the API
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
 
-            if (fullText.length < 500) {
-                showStatus(uploadStatus, 'Error: Could not extract enough text. Is this a scanned PDF?', 'error');
-                return;
+            if (allQuotes.length === 0) {
+                throw new Error("No quotes found in the entire book. Is it a scanned PDF?");
             }
-
-            // 3. Send to AI
-            showStatus(uploadStatus, `Analyzing text with Gemini AI (0/${maxPages} pages read)...`, 'success');
-            const extractedQuotes = await AIService.extractQuotes(fullText, data.geminiApiKey);
 
             // 4. Save Results
             // Add book title to each quote
-            const newQuotes = extractedQuotes.map(q => ({
+            const finalQuotes = allQuotes.map(q => ({
                 text: q.text,
                 author: q.author || "Unknown",
                 book: file.name.replace('.pdf', '')
@@ -133,17 +146,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Save text to "customQuotes"
             const currentCustomQuotes = (await chrome.storage.local.get('customQuotes')).customQuotes || [];
-            const updatedCustomQuotes = [...currentCustomQuotes, ...newQuotes];
+            const updatedCustomQuotes = [...currentCustomQuotes, ...finalQuotes];
 
             // Update books list
             const currentBooks = data.processedBooks || [];
-            if (!currentBooks.some(b => b.title === file.name)) {
-                currentBooks.push({
-                    title: file.name,
-                    quoteCount: newQuotes.length,
-                    date: new Date().toISOString()
-                });
+            // Remove old entry if it exists to update count
+            const existingBookIndex = currentBooks.findIndex(b => b.title === file.name);
+            if (existingBookIndex !== -1) {
+                currentBooks.splice(existingBookIndex, 1);
             }
+
+            currentBooks.push({
+                title: file.name,
+                quoteCount: finalQuotes.length,
+                date: new Date().toISOString()
+            });
 
             await chrome.storage.local.set({
                 customQuotes: updatedCustomQuotes,
@@ -157,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
             customQuotesEl.textContent = updatedCustomQuotes.length;
             totalQuotesEl.textContent = total;
 
-            showStatus(uploadStatus, `Success! Extracted ${newQuotes.length} quotes from "${file.name}".`, 'success');
+            showStatus(uploadStatus, `Success! Extracted ${finalQuotes.length} quotes from full book "${file.name}".`, 'success');
 
         } catch (error) {
             console.error(error);
@@ -185,11 +202,167 @@ document.addEventListener('DOMContentLoaded', () => {
         books.forEach(book => {
             const li = document.createElement('li');
             li.className = 'book-item';
+            // Store book title in data attribute for easy access
+            li.dataset.title = book.title;
             li.innerHTML = `
                 <span>${book.title}</span>
                 <span class="badge">${book.quoteCount} quotes</span>
             `;
+
+            // Add click listener to open modal
+            li.addEventListener('click', () => {
+                openModal(book.title);
+            });
+
             bookList.appendChild(li);
         });
+    }
+
+    // --- MODAL LOGIC ---
+    const modal = document.getElementById('quoteModal');
+    const closeModalBtn = document.querySelector('.close-modal');
+    const modalBookTitle = document.getElementById('modalBookTitle');
+    const modalQuoteList = document.getElementById('modalQuoteList');
+    const newQuoteText = document.getElementById('newQuoteText');
+    const addQuoteBtn = document.getElementById('addQuoteBtn');
+
+    let currentOpenBook = null;
+
+    // Close Modal Listeners
+    closeModalBtn.addEventListener('click', closeModal);
+    window.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+
+    // Add Quote Listener
+    addQuoteBtn.addEventListener('click', async () => {
+        const text = newQuoteText.value.trim();
+        if (!text) return;
+
+        await addQuote(text, currentOpenBook);
+        newQuoteText.value = ''; // clear input
+    });
+
+    async function openModal(bookTitle) {
+        currentOpenBook = bookTitle;
+        modalBookTitle.textContent = bookTitle;
+        modal.style.display = 'block';
+        await renderModalQuotes(bookTitle);
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+        currentOpenBook = null;
+    }
+
+    async function renderModalQuotes(bookTitle) {
+        modalQuoteList.innerHTML = '<div style="text-align:center; padding:20px; color:#9aa0a6;">Loading quotes...</div>';
+
+        const data = await chrome.storage.local.get('customQuotes');
+        const allQuotes = data.customQuotes || [];
+
+        // Filter quotes for this book
+        // Note: The file logic removes .pdf extension during save, but UI lists full name.
+        // We need to match loosely or fix the saving logic consistency. 
+        // options.js save logic: book: file.name.replace('.pdf', '')
+        // updateBookList logic: book.title is file.name (with .pdf)
+        const targetBookName = bookTitle.replace('.pdf', '');
+
+        const bookQuotes = allQuotes.filter(q => q.book === targetBookName || q.book === bookTitle);
+
+        modalQuoteList.innerHTML = '';
+        if (bookQuotes.length === 0) {
+            modalQuoteList.innerHTML = '<div style="text-align:center; padding:20px; color:#9aa0a6;">No quotes found for this book.</div>';
+            return;
+        }
+
+        bookQuotes.forEach(quote => {
+            const li = document.createElement('li');
+            li.className = 'quote-item-view';
+
+            const textDiv = document.createElement('div');
+            textDiv.className = 'quote-content';
+            textDiv.textContent = `"${quote.text}"`;
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'delete-quote-btn';
+            delBtn.innerHTML = '&#10006;'; // X symbol
+            delBtn.title = 'Delete Quote';
+            delBtn.onclick = () => deleteQuote(quote.text, bookTitle);
+
+            li.appendChild(textDiv);
+            li.appendChild(delBtn);
+            modalQuoteList.appendChild(li);
+        });
+    }
+
+    async function addQuote(text, bookTitle) {
+        if (!bookTitle) return;
+
+        const data = await chrome.storage.local.get(['customQuotes', 'processedBooks']);
+        let allQuotes = data.customQuotes || [];
+        let books = data.processedBooks || [];
+
+        // Add proper normalization
+        const normalizedTitle = bookTitle.replace('.pdf', '');
+
+        const newQuote = {
+            text: text,
+            author: "Unknown", // User added
+            book: normalizedTitle
+        };
+
+        allQuotes.push(newQuote);
+
+        // Update book count
+        const bookIndex = books.findIndex(b => b.title === bookTitle);
+        if (bookIndex !== -1) {
+            books[bookIndex].quoteCount += 1;
+        }
+
+        await chrome.storage.local.set({ customQuotes: allQuotes, processedBooks: books });
+
+        // Refresh views
+        updateBookList(books);
+        await renderModalQuotes(bookTitle);
+
+        // Update stats
+        const total = 22 + allQuotes.length;
+        customQuotesEl.textContent = allQuotes.length;
+        totalQuotesEl.textContent = total;
+    }
+
+    async function deleteQuote(quoteText, bookTitle) {
+        if (!confirm('Are you sure you want to delete this quote?')) return;
+
+        const data = await chrome.storage.local.get(['customQuotes', 'processedBooks']);
+        let allQuotes = data.customQuotes || [];
+        let books = data.processedBooks || [];
+
+        // Filter out the specific quote
+        // We match by text since we don't have IDs. Limitation: Duplicate texts will both be deleted.
+        const initialLength = allQuotes.length;
+        allQuotes = allQuotes.filter(q => q.text !== quoteText);
+
+        if (allQuotes.length === initialLength) return; // Nothing deleted
+
+        // Update book count
+        const bookIndex = books.findIndex(b => b.title === bookTitle);
+        if (bookIndex !== -1) {
+            books[bookIndex].quoteCount = Math.max(0, books[bookIndex].quoteCount - 1);
+        }
+
+        await chrome.storage.local.set({ customQuotes: allQuotes, processedBooks: books });
+
+        // Refresh views
+        updateBookList(books);
+        await renderModalQuotes(bookTitle);
+
+        // Update stats
+        const total = 22 + allQuotes.length;
+        customQuotesEl.textContent = allQuotes.length;
+        totalQuotesEl.textContent = total;
     }
 });

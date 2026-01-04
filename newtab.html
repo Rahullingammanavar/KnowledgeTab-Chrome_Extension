@@ -26,6 +26,40 @@
         </div>
     </div>
 
+    <!-- Breathing Widget -->
+    <div class="breathing-widget" id="breathingWidget">
+        <div class="breathing-content">
+            <div class="breathing-circle"></div>
+            <div class="breathing-text" id="breathingText">Start Breathing</div>
+        </div>
+        <button class="close-breathing" id="closeBreathing" style="display: none;">&times;</button>
+    </div>
+
+    <!-- Habit Tracker Button -->
+    <div id="habitBtn" class="habit-btn" style="cursor: pointer;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        <span>Track Habits</span>
+    </div>
+
+    <!-- Password Modal -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content" style="max-width: 400px; height: auto;">
+            <div class="modal-header">
+                <h2>Enter Password</h2>
+                <span class="close-modal" id="closePasswordModal">&times;</span>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="password" id="passwordInput" placeholder="Enter password" class="password-input">
+                <button id="submitPassword" class="submit-btn">Unlock</button>
+                <p id="errorMessage" style="color: #f28b82; display: none; margin-top: 5px;">Incorrect password</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Load quotes first, then the script that uses them -->
     <script src="quotes.js"></script>
     <script src="script.js"></script>
