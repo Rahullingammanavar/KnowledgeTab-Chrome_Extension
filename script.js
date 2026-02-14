@@ -55,9 +55,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize Quotes
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.get(['customQuotes'], (result) => {
+        chrome.storage.local.get(['customQuotes', 'processedBooks'], (result) => {
+            console.log('Storage data loaded:', result); // Debug log
+            
             const customQuotes = result.customQuotes || [];
-            const quotesList = [...builtInQuotes, ...customQuotes];
+            const books = result.processedBooks || [];
+            
+            // Create a set of enabled book names for quick lookup
+            const enabledBooks = new Set();
+            books.forEach(book => {
+                if (book.enabled !== false) {
+                    enabledBooks.add(book.title.replace('.pdf', ''));
+                }
+            });
+            
+            console.log('Enabled books:', Array.from(enabledBooks)); // Debug log
+            
+            // Filter to show only quotes from enabled books that are also enabled themselves
+            const filteredQuotes = customQuotes.filter(quote => {
+                const isBookEnabled = enabledBooks.has(quote.book);
+                const isQuoteEnabled = quote.enabled !== false;
+                console.log(`Quote "${quote.text.substring(0, 30)}...": BookEnabled=${isBookEnabled}, QuoteEnabled=${isQuoteEnabled}`); // Debug log
+                return isBookEnabled && isQuoteEnabled;
+            });
+            
+            console.log('Filtered quotes count:', filteredQuotes.length); // Debug log
+            
+            const quotesList = [...builtInQuotes, ...filteredQuotes];
+            console.log('Final quotes list length:', quotesList.length); // Debug log
             renderQuote(quotesList);
         });
     } else {

@@ -154,12 +154,131 @@
             align-items: center;
         }
 
+        .book-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+        }
+
         .badge {
             font-size: 0.8rem;
             padding: 4px 8px;
             border-radius: 4px;
             background: #3c4043;
             color: #e8eaed;
+        }
+
+        .book-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .book-toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .book-toggle-label {
+            font-size: 0.8rem;
+            color: #bdc1c6;
+        }
+
+        .btn-small {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            border: 1px solid #ffd700;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-small:hover {
+            background: #ffd700;
+            color: #1a1c2c;
+        }
+
+        .btn-small.delete {
+            background: rgba(242, 139, 130, 0.2);
+            color: #f28b82;
+            border: 1px solid #f28b82;
+        }
+
+        .btn-small.delete:hover {
+            background: #f28b82;
+            color: #1a1c2c;
+        }
+
+        /* Toggle Switch Styles */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #5f6368;
+            transition: .4s;
+            border-radius: 20px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #ffd700;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        .quote-item-view {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+        }
+
+        .quote-content {
+            flex: 1;
+            margin-right: 12px;
+            word-break: break-word;
+        }
+
+        .quote-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
     </style>
 </head>

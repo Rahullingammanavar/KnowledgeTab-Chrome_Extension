@@ -141,7 +141,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const finalQuotes = allQuotes.map(q => ({
                 text: q.text,
                 author: q.author || "Unknown",
-                book: file.name.replace('.pdf', '')
+                book: file.name.replace('.pdf', ''),
+                enabled: true // Enable by default
             }));
 
             // Save text to "customQuotes"
@@ -159,7 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
             currentBooks.push({
                 title: file.name,
                 quoteCount: finalQuotes.length,
-                date: new Date().toISOString()
+                date: new Date().toISOString(),
+                enabled: true // Enable by default
             });
 
             await chrome.storage.local.set({
@@ -204,17 +206,68 @@ document.addEventListener('DOMContentLoaded', () => {
             li.className = 'book-item';
             // Store book title in data attribute for easy access
             li.dataset.title = book.title;
+            
+            const bookTitleWithoutExt = book.title.replace('.pdf', '');
+            
+            // Check if book is enabled (default to true if not set)
+            const isBookEnabled = book.enabled !== false;
+            
             li.innerHTML = `
-                <span>${book.title}</span>
-                <span class="badge">${book.quoteCount} quotes</span>
+                <div class="book-info">
+                    <span>${book.title}</span>
+                    <span class="badge">${book.quoteCount} quotes</span>
+                </div>
+                <div class="book-actions">
+                    <div class="book-toggle-container">
+                        <span class="book-toggle-label">Show:</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" 
+                                   class="book-toggle" 
+                                   data-book="${bookTitleWithoutExt}"
+                                   ${isBookEnabled ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <button class="btn-small" data-action="view" data-book="${bookTitleWithoutExt}">View Quotes</button>
+                    <button class="btn-small delete" data-action="delete" data-book="${bookTitleWithoutExt}">Delete</button>
+                </div>
             `;
 
-            // Add click listener to open modal
-            li.addEventListener('click', () => {
-                openModal(book.title);
-            });
-
             bookList.appendChild(li);
+        });
+        
+        // Add event listeners to the buttons and toggles
+        bookList.addEventListener('click', (e) => {
+            if (e.target.classList.contains('btn-small')) {
+                const action = e.target.dataset.action;
+                const bookTitle = e.target.dataset.book;
+                
+                if (action === 'view') {
+                    openModal(bookTitle + '.pdf'); // Add .pdf back for modal
+                } else if (action === 'delete') {
+                    deleteBook(bookTitle);
+                }
+            }
+        });
+        
+        // Add event listeners for book toggle switches
+        bookList.addEventListener('change', async (e) => {
+            if (e.target.classList.contains('book-toggle')) {
+                const bookName = e.target.dataset.book;
+                const isEnabled = e.target.checked;
+                
+                // Update the book in storage
+                const data = await chrome.storage.local.get('processedBooks');
+                let books = data.processedBooks || [];
+                
+                const bookIndex = books.findIndex(b => b.title.replace('.pdf', '') === bookName);
+                
+                if (bookIndex !== -1) {
+                    books[bookIndex].enabled = isEnabled;
+                    await chrome.storage.local.set({ processedBooks: books });
+                    showStatus(uploadStatus, `Book "${bookName}" ${isEnabled ? 'enabled' : 'disabled'} successfully!`, 'success');
+                }
+            }
         });
     }
 
@@ -264,12 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const allQuotes = data.customQuotes || [];
 
         // Filter quotes for this book
-        // Note: The file logic removes .pdf extension during save, but UI lists full name.
-        // We need to match loosely or fix the saving logic consistency. 
-        // options.js save logic: book: file.name.replace('.pdf', '')
-        // updateBookList logic: book.title is file.name (with .pdf)
         const targetBookName = bookTitle.replace('.pdf', '');
-
         const bookQuotes = allQuotes.filter(q => q.book === targetBookName || q.book === bookTitle);
 
         modalQuoteList.innerHTML = '';
@@ -278,23 +326,71 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        bookQuotes.forEach(quote => {
-            const li = document.createElement('li');
-            li.className = 'quote-item-view';
+        // Create a map to track quote indices for updating
+        const quoteIndices = new Map();
+        
+        bookQuotes.forEach((quote, index) => {
+            // Find the actual index in the full array
+            const actualIndex = allQuotes.findIndex(q => 
+                q.book === quote.book && 
+                q.text === quote.text &&
+                q.author === quote.author
+            );
+            
+            if (actualIndex !== -1) {
+                quoteIndices.set(index, actualIndex);
+                
+                const li = document.createElement('li');
+                li.className = 'quote-item-view';
+                
+                // Use the actual index for identification
+                const quoteId = `quote_${actualIndex}`;
 
-            const textDiv = document.createElement('div');
-            textDiv.className = 'quote-content';
-            textDiv.textContent = `"${quote.text}"`;
+                li.innerHTML = `
+                    <div class="quote-content">
+                        "${quote.text}"
+                    </div>
+                    <div class="quote-actions">
+                        <label class="toggle-switch">
+                            <input type="checkbox" 
+                                   data-quote-index="${actualIndex}" 
+                                   data-book="${targetBookName}"
+                                   ${quote.enabled !== false ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                        <button class="delete-quote-btn" title="Delete Quote">&#10006;</button>
+                    </div>
+                `;
 
-            const delBtn = document.createElement('button');
-            delBtn.className = 'delete-quote-btn';
-            delBtn.innerHTML = '&#10006;'; // X symbol
-            delBtn.title = 'Delete Quote';
-            delBtn.onclick = () => deleteQuote(quote.text, bookTitle);
+                modalQuoteList.appendChild(li);
+            }
+        });
 
-            li.appendChild(textDiv);
-            li.appendChild(delBtn);
-            modalQuoteList.appendChild(li);
+        // Add event listeners for toggle switches
+        modalQuoteList.addEventListener('change', async (e) => {
+            if (e.target.type === 'checkbox') {
+                const quoteIndex = parseInt(e.target.dataset.quoteIndex);
+                const bookName = e.target.dataset.book;
+                const isEnabled = e.target.checked;
+                
+                // Update the quote in storage
+                const data = await chrome.storage.local.get('customQuotes');
+                let allQuotes = data.customQuotes || [];
+                
+                if (quoteIndex < allQuotes.length) {
+                    allQuotes[quoteIndex].enabled = isEnabled;
+                    await chrome.storage.local.set({ customQuotes: allQuotes });
+                    showStatus(uploadStatus, `Quote ${isEnabled ? 'enabled' : 'disabled'} successfully!`, 'success');
+                }
+            }
+        });
+
+        // Add event listeners for delete buttons
+        modalQuoteList.addEventListener('click', (e) => {
+            if (e.target.classList.contains('delete-quote-btn')) {
+                const quoteText = e.target.closest('.quote-item-view').querySelector('.quote-content').textContent.replace(/"/g, '').trim();
+                deleteQuote(quoteText, bookTitle);
+            }
         });
     }
 
@@ -339,7 +435,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const newQuote = {
             text: text,
             author: "Unknown", // User added
-            book: normalizedTitle
+            book: normalizedTitle,
+            enabled: true // Enable by default
         };
 
         allQuotes.push(newQuote);
@@ -348,12 +445,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const bookIndex = books.findIndex(b => b.title === bookTitle);
         if (bookIndex !== -1) {
             books[bookIndex].quoteCount += 1;
+            // Ensure the book has an enabled status (default to true)
+            if (books[bookIndex].enabled === undefined) {
+                books[bookIndex].enabled = true;
+            }
         } else {
             // Create new book entry
             books.push({
                 title: bookTitle,
                 quoteCount: 1,
-                date: new Date().toISOString()
+                date: new Date().toISOString(),
+                enabled: true // Enable by default
             });
         }
 
@@ -373,6 +475,80 @@ document.addEventListener('DOMContentLoaded', () => {
         totalQuotesEl.textContent = total;
     }
 
+    async function deleteBook(bookTitle) {
+        if (!confirm(`Are you sure you want to delete all quotes from "${bookTitle}"?`)) return;
+        
+        try {
+            const data = await chrome.storage.local.get(['customQuotes', 'processedBooks']);
+            let allQuotes = data.customQuotes || [];
+            let books = data.processedBooks || [];
+            
+            // Remove all quotes from this book
+            allQuotes = allQuotes.filter(q => q.book !== bookTitle);
+            
+            // Remove the book from processed books
+            books = books.filter(b => b.title.replace('.pdf', '') !== bookTitle);
+            
+            await chrome.storage.local.set({ customQuotes: allQuotes, processedBooks: books });
+            
+            // Refresh views
+            updateBookList(books);
+            
+            // Update stats
+            const total = 22 + allQuotes.length;
+            customQuotesEl.textContent = allQuotes.length;
+            totalQuotesEl.textContent = total;
+            
+            showStatus(uploadStatus, `Successfully deleted "${bookTitle}" and all its quotes.`, 'success');
+        } catch (error) {
+            console.error('Error deleting book:', error);
+            showStatus(uploadStatus, `Error deleting book: ${error.message}`, 'error');
+        }
+    }
+
+    // Update book enabled status
+    async function updateBookEnabledStatus(bookName, isEnabled) {
+        try {
+            const data = await chrome.storage.local.get('processedBooks');
+            let books = data.processedBooks || [];
+            
+            // Find and update the book
+            const bookIndex = books.findIndex(b => b.title.replace('.pdf', '') === bookName);
+            
+            if (bookIndex !== -1) {
+                books[bookIndex].enabled = isEnabled;
+                await chrome.storage.local.set({ processedBooks: books });
+                showStatus(uploadStatus, `Book "${bookName}" ${isEnabled ? 'enabled' : 'disabled'} successfully!`, 'success');
+            }
+        } catch (error) {
+            console.error('Error updating book status:', error);
+            showStatus(uploadStatus, `Error updating book: ${error.message}`, 'error');
+        }
+    }
+
+    // Update quote enabled status
+    async function updateQuoteEnabledStatus(quoteId, bookName, isEnabled) {
+        try {
+            const data = await chrome.storage.local.get('customQuotes');
+            let allQuotes = data.customQuotes || [];
+            
+            // Find and update the quote
+            const quoteIndex = allQuotes.findIndex(q => 
+                q.book === bookName && 
+                `${q.book}_${allQuotes.indexOf(q)}_${q.text.substring(0, 20).replace(/\s+/g, '_')}` === quoteId
+            );
+            
+            if (quoteIndex !== -1) {
+                allQuotes[quoteIndex].enabled = isEnabled;
+                await chrome.storage.local.set({ customQuotes: allQuotes });
+                showStatus(uploadStatus, `Quote ${isEnabled ? 'enabled' : 'disabled'} successfully!`, 'success');
+            }
+        } catch (error) {
+            console.error('Error updating quote status:', error);
+            showStatus(uploadStatus, `Error updating quote: ${error.message}`, 'error');
+        }
+    }
+
     async function deleteQuote(quoteText, bookTitle) {
         if (!confirm('Are you sure you want to delete this quote?')) return;
 
@@ -380,9 +556,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let allQuotes = data.customQuotes || [];
         let books = data.processedBooks || [];
 
-        // Filter out the specific quote
+        // Find and remove the specific quote
         const initialLength = allQuotes.length;
-        allQuotes = allQuotes.filter(q => q.text !== quoteText);
+        allQuotes = allQuotes.filter(q => !(q.text === quoteText && q.book === bookTitle.replace('.pdf', '')));
 
         if (allQuotes.length === initialLength) return; // Nothing deleted
 
@@ -390,12 +566,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const bookIndex = books.findIndex(b => b.title === bookTitle);
         if (bookIndex !== -1) {
             books[bookIndex].quoteCount = Math.max(0, books[bookIndex].quoteCount - 1);
-
-            // Optional: Remove book if count is 0? 
-            // Only if it's not a real file-based book maybe? For now keep it simple.
-            if (books[bookIndex].quoteCount === 0) {
-                // Maybe remove it? Let's keep it so user can add back to it easily.
-            }
         }
 
         await chrome.storage.local.set({ customQuotes: allQuotes, processedBooks: books });
@@ -410,5 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const total = 22 + allQuotes.length;
         customQuotesEl.textContent = allQuotes.length;
         totalQuotesEl.textContent = total;
+        
+        showStatus(uploadStatus, 'Quote deleted successfully!', 'success');
     }
 });
